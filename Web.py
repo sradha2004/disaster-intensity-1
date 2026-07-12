@@ -5,6 +5,10 @@ import mysql.connector
 import warnings
 import datetime
 import cv2
+import pickle
+import numpy as np
+# Load trained model
+model = pickle.load(open('Earth/prediction-gb-model.pkl', 'rb'))
 
 from flask import Flask, render_template, request, jsonify
 
@@ -266,6 +270,61 @@ def testimage():
         noi = 'static/Out/noi.jpg'
 
         return render_template('Prediction.html', result=out, org=org, gry=gry, inv=inv, noi=noi,color=color)
+
+
+
+
+@app.route("/EarthPredict")
+def EarthPredict():
+    return render_template('EarthPredict.html')
+
+# Prediction route
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        # Get form values
+        features = [
+            float(request.form['magnitude']),
+            float(request.form['cdi']),
+            float(request.form['mmi']),
+            float(request.form['tsunami']),
+            float(request.form['sig']),
+            float(request.form['nst']),
+            float(request.form['dmin']),
+            float(request.form['gap']),
+            float(request.form['depth']),
+            float(request.form['latitude']),
+            float(request.form['longitude'])
+        ]
+
+        final_features = np.array([features])
+
+        prediction = model.predict(final_features)[0]
+
+        # Convert numeric prediction to label
+        alert_map = {
+            0: "Green",
+            1: "Yellow",
+            2: "Orange",
+            3: "Red"
+        }
+
+        result = alert_map.get(prediction, "Unknown")
+        if result == "Green":
+            color = 'green'
+        elif result == "Yellow":
+            color = 'yellow'
+        elif result == "Orange":
+            color = 'orange'
+        elif result == "Red":
+            color = 'red'
+        #sendmail("sradhasreekumar2004@gmail.com", f"Earth Quake Alert Level: {result}")
+        sendmsg('9074458220',f"Earth Quake: {result}")
+        return render_template('EarthPredict.html', prediction_text=f"Alert Level: {result}",color=color)
+
+    except Exception as e:
+        return render_template('EarthPredict.html', prediction_text=f"Error: {str(e)}")
+
 
 
 
